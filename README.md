@@ -2,106 +2,127 @@
 
 **Spring Boot Business Backend for EnterpriseOps AI**
 
-EnterpriseOps Business is the Java Spring Boot backend for the EnterpriseOps AI platform. It provides REST APIs for business operations, including order retrieval, customer support-ticket management, and workflow operations that can require human approval.
+EnterpriseOps Business is the Java Spring Boot backend for an AI-assisted customer support and business workflow platform. It provides REST APIs for order retrieval, support-ticket management, user authentication, and workflows that can require human approval.
 
-The service manages business data and database operations through Spring Data JPA and Hibernate, with PostgreSQL as the persistence layer and Flyway for database schema migrations.
+The service manages business operations and persistence using Spring Data JPA, Hibernate, PostgreSQL, and Flyway database migrations. It integrates with a Python FastAPI service that orchestrates AI agents and retrieval-augmented generation (RAG).
 
 ## Overview
 
-EnterpriseOps AI combines AI-assisted investigation with controlled business operations.
+EnterpriseOps AI separates AI reasoning from business execution:
 
-The platform separates AI orchestration from business logic:
+- **Python AI service:** Orchestrates LLM-powered investigation, policy retrieval, and support triage.
+- **EnterpriseOps Business:** Manages business APIs, authentication, authorization, workflow operations, and database access.
+- **PostgreSQL:** Stores orders, support tickets, workflows, and user accounts.
 
-- **Python AI service:** Handles LLM orchestration, retrieval-augmented generation (RAG), and communication with the business backend.
-- **EnterpriseOps Business:** Manages business APIs, request validation, persistence, and business workflow operations.
-- **PostgreSQL:** Stores business data managed by the Java backend.
+The AI service communicates with the Java backend through REST APIs rather than connecting directly to PostgreSQL.
 
-This separation keeps business data access and business operations within the Spring Boot service rather than having the Python AI service connect directly to PostgreSQL.
+## Features
+
+### Order Management
+- Retrieve order information through REST APIs.
+- Provide order data to the AI-assisted investigation workflow.
+- Keep business data access within the Java backend.
+
+### Support Ticket Management
+- Retrieve support-ticket information.
+- Persist ticket records in PostgreSQL.
+- Support controlled ticket creation through the workflow approval process, where enforced by the current implementation.
+
+### Business Workflow Management
+- Create and retrieve business workflows.
+- Support workflow approval and rejection operations.
+- Separate AI-generated proposals from business execution.
+- Require authorized approval before ticket creation in the implemented approval flow.
+
+### Authentication and User Management
+- Register users with a username, email address, and password.
+- Authenticate using a username or email address.
+- Hash passwords using Spring Security's BCrypt password encoder.
+- Issue JWT bearer access tokens after successful login.
+- Include user identity and role claims in JWTs.
+- Assign the `USER` role during public registration.
+- Support initial administrator provisioning through environment-based configuration.
+
+### Authorization
+- Validate JWT bearer tokens using Spring Security's OAuth2 Resource Server support.
+- Configure role-based restrictions for workflow approval and rejection.
+- Keep authentication and authorization enforcement within the Java backend.
+
+**Security note:** These capabilities should be considered fully verified only after successful runtime tests confirm token validation, role restrictions, and protection of all sensitive endpoints.
+
+### Database and Persistence
+- PostgreSQL integration.
+- Spring Data JPA and Hibernate.
+- Flyway-managed schema migrations.
+- Entity, repository, service, and controller separation.
 
 ## Technology Stack
 
 | Component | Technology |
 |---|---|
-| Language | Java |
-| Backend framework | Spring Boot |
+| Language | Java 21 |
+| Backend framework | Spring Boot 4.1.1 |
+| API architecture | REST |
+| Security | Spring Security |
+| Authentication | JWT bearer tokens |
+| Password hashing | BCrypt |
 | Persistence | Spring Data JPA |
 | ORM | Hibernate |
 | Database | PostgreSQL |
-| Database migrations | Flyway |
-| API architecture | REST |
+| Schema migrations | Flyway |
 | Build tool | Maven |
-| AI service integration | Python FastAPI service |
-
-## Features
-
-### Order Management
-
-- Retrieve order information through REST APIs.
-- Provide order data to the broader AI-powered support workflow.
-- Keep order retrieval within the business backend.
-
-### Customer Support Tickets
-
-- Create support tickets through REST APIs.
-- Retrieve ticket information.
-- Persist ticket data in PostgreSQL.
-
-### Business Workflows
-
-The service provides a foundation for AI-assisted business workflows, including workflow creation, retrieval, and approval or rejection operations where supported by the current controller implementation.
-
-Human approval is an important part of the design for workflows that require review before a business action is accepted.
-
-### Persistence and Database Management
-
-- PostgreSQL integration.
-- Entity-based persistence using Spring Data JPA and Hibernate.
-- Database schema migrations managed through Flyway.
-- Separation of API, business logic, and database access responsibilities.
+| API documentation | Springdoc OpenAPI |
+| AI integration | Python FastAPI service |
 
 ## Architecture
 
 ```text
-          Client / React Dashboard
-                    |
-                    v
-          Python AI Service
-          FastAPI + LLM / RAG
-                    |
-             REST API calls
-                    |
-                    v
-       EnterpriseOps Business
-          Spring Boot REST APIs
-                    |
-                    v
-           Service / Business Logic
-                    |
-                    v
-         Spring Data JPA / Hibernate
-                    |
-                    v
-             PostgreSQL
+                Client / Dashboard
+                       |
+                       v
+              Python AI Service
+               FastAPI + LLM/RAG
+                       |
+                  REST APIs
+                       |
+                       v
+             EnterpriseOps Business
+                Spring Boot
+                       |
+          +------------+-------------+
+          |            |             |
+          v            v             v
+       Security     Services     Controllers
+       JWT/Roles    Workflows     REST APIs
+          |            |
+          +------------+
+                       |
+                       v
+             Spring Data JPA
+                 Hibernate
+                       |
+                       v
+                 PostgreSQL
 ```
 
 ### Architecture Responsibilities
 
 **Python AI service**
-- Orchestrates AI-assisted workflows.
-- Handles LLM interactions and retrieval.
-- Calls the Java backend through REST APIs when business data or operations are required.
+- Coordinates AI agents.
+- Retrieves relevant policy information.
+- Produces investigation and triage proposals.
+- Calls the Java backend through HTTP APIs.
 
 **Spring Boot business backend**
-- Exposes REST endpoints for business operations.
 - Validates incoming requests.
-- Executes business logic and workflow operations.
-- Persists and retrieves business data.
+- Authenticates users and validates JWTs.
+- Enforces configured authorization rules.
+- Executes business and workflow operations.
+- Manages persistence.
 
 **PostgreSQL**
-- Stores business records managed by the Java service.
-- Uses schema migrations to manage database structure changes.
-
-The Python AI service communicates with the Java backend through HTTP APIs and does not access the business database directly.
+- Stores business records.
+- Uses Flyway migrations to manage schema changes.
 
 ## Project Structure
 
@@ -109,47 +130,53 @@ The Python AI service communicates with the Java backend through HTTP APIs and d
 EnterpriseOps-Business/
 ├── src/
 │   ├── main/
-│   │   ├── java/
-│   │   │   └── ... Java application packages
+│   │   ├── java/com/driveease/gateway/
+│   │   │   ├── controller/
+│   │   │   ├── dto/
+│   │   │   ├── entity/
+│   │   │   ├── exception/
+│   │   │   ├── repository/
+│   │   │   ├── security/
+│   │   │   └── service/
 │   │   └── resources/
 │   │       ├── application.properties
-│   │       └── db/
-│   │           └── migration/
-│   └── test/
-│       └── java/
+│   │       └── db/migration/
+│   └── test/java/
 ├── mvnw
 ├── mvnw.cmd
 ├── pom.xml
-├── .gitignore
 └── README.md
 ```
 
-The Java packages contain the application's controllers, business logic, persistence components, and supporting classes. The exact package organization depends on the current source code.
-
 ## API Overview
 
-The service supports the following resource areas, subject to the current controller implementation.
+The following paths describe the intended API areas. Confirm exact HTTP methods and request/response formats using the current controller classes or generated API documentation.
 
-| Resource | Purpose |
-|---|---|
-| `/api/v1/orders` | Order-related operations |
-| `/api/v1/tickets` | Support-ticket creation and retrieval |
-| `/api/v1/workflows` | Workflow creation, retrieval, approval, and rejection |
+| Endpoint | Purpose | Access |
+|---|---|---|
+| `POST /api/v1/auth/register` | Register a user | Public |
+| `POST /api/v1/auth/login` | Authenticate and obtain a JWT | Public |
+| `/api/v1/orders` | Order operations | Authentication required unless explicitly configured otherwise |
+| `/api/v1/tickets` | Support-ticket operations | Authentication required unless explicitly configured otherwise |
+| `/api/v1/workflows` | Workflow operations | Authentication required unless explicitly configured otherwise |
+| `POST /api/v1/workflows/{workflowNumber}/approve` | Approve a workflow | `ADMIN` or `SUPPORT` |
+| `POST /api/v1/workflows/{workflowNumber}/reject` | Reject a workflow | `ADMIN` or `SUPPORT` |
 
-For exact HTTP methods, request formats, response structures, and route paths, refer to the corresponding Spring Boot controller classes and request DTOs.
+The configured security rules determine access. Review `SecurityConfig.java` before exposing the application publicly.
 
 ## Prerequisites
 
-Before running the service, ensure that you have:
+Install or configure:
 
-- Java compatible with the project's Maven configuration.
-- PostgreSQL installed and running.
+- Java 21.
+- PostgreSQL.
 - Git.
-- A terminal or IDE capable of running Maven projects.
+- Maven, or use the included Maven wrapper.
+- An IDE such as Eclipse or IntelliJ IDEA.
 
 ## Getting Started
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/vishwajeethshikari/EnterpriseOps-Business.git
@@ -158,9 +185,9 @@ cd EnterpriseOps-Business
 
 ### 2. Configure PostgreSQL
 
-Create the database required by your local configuration if it does not already exist.
+Create the database required by your local configuration.
 
-Configure the database URL, username, and password using your application's configuration and environment variables.
+Configure the JDBC URL, database username, and password using environment variables or another secure configuration mechanism. Make sure `application.properties` references the corresponding variables.
 
 For example, in Windows PowerShell:
 
@@ -168,13 +195,41 @@ For example, in Windows PowerShell:
 $env:DB_PASSWORD = "your-local-database-password"
 ```
 
-Make sure your application configuration references the correct environment variable. Set the database URL and username according to your local PostgreSQL setup.
+The variable name must match the one referenced in your application configuration.
 
-**Security:** Never commit real database passwords, API keys, tokens, or other secrets to source control.
+Never commit real database credentials, JWT secrets, administrator passwords, or other secrets to Git.
 
-### 3. Run the Application
+### 3. Configure JWT signing
 
-From the project root, run the Maven wrapper on Windows:
+The application expects a `JWT_SECRET` environment variable containing a sufficiently long secret for HS256 signing.
+
+Generate a cryptographically random secret and configure it in the environment used to launch Spring Boot.
+
+For local development, PowerShell can set the variable for the current terminal session:
+
+```powershell
+$env:JWT_SECRET = "<your-generated-secret>"
+```
+
+Do not use the placeholder as a real secret. Keep the secret private and do not commit it to source control.
+
+### 4. Configure the initial administrator
+
+If using the initial administrator bootstrap, configure all three environment variables before starting the application:
+
+```powershell
+$env:INITIAL_ADMIN_USERNAME = "your-admin-username"
+$env:INITIAL_ADMIN_EMAIL = "your-admin-email@example.com"
+$env:INITIAL_ADMIN_PASSWORD = "<your-strong-unique-password>"
+```
+
+The bootstrap implementation should create the administrator only when configured and should not reset the password of an existing administrator.
+
+Do not use weak credentials or share administrator passwords.
+
+### 5. Run the application
+
+On Windows PowerShell:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -186,67 +241,120 @@ On macOS or Linux:
 ./mvnw spring-boot:run
 ```
 
-The service is configured to run on:
+The service is expected to use port `8080` unless overridden by configuration.
+
+Flyway applies pending migrations at startup. Check the application logs for migration errors and database connectivity issues.
+
+### 6. Open API documentation
+
+If Springdoc is configured and the application starts successfully, open:
 
 ```text
-http://localhost:8080
+http://localhost:8080/swagger-ui/index.html
 ```
 
-The actual port and database settings are determined by the application's configuration.
+Use the documentation to inspect available endpoints, request formats, and responses.
 
-### 4. Verify the Service
+## Authentication Examples
 
-Once the application has started successfully, test the available endpoints using an API client or the API documentation configured in the project.
+### Register a user
 
-Check the application logs to confirm that the database connection and Flyway migrations complete successfully.
+`POST /api/v1/auth/register`
 
-## Integration with the Python AI Service
+```json
+{
+  "username": "supportuser",
+  "email": "supportuser@example.com",
+  "password": "your-strong-unique-password"
+}
+```
 
-EnterpriseOps Business is designed to integrate with the Python FastAPI orchestration service.
+Public registration should assign the `USER` role automatically. Clients must not be permitted to select their own privileged role.
 
-The intended interaction is:
+### Log in
 
-1. The Python service receives or processes an AI-assisted business request.
-2. It retrieves relevant business information through the Java REST APIs.
-3. The Java backend validates the request and performs the applicable business operation.
-4. Business data is persisted in PostgreSQL.
-5. Where approval is required, a workflow can be reviewed and approved or rejected through supported backend operations.
+`POST /api/v1/auth/login`
 
-The exact integration behavior depends on the endpoints and workflow rules implemented in the current codebase.
+```json
+{
+  "usernameOrEmail": "supportuser@example.com",
+  "password": "your-strong-unique-password"
+}
+```
 
-## Security and Reliability
+A successful login returns a bearer access token.
 
-The backend should be configured and tested to ensure that:
+### Access a protected endpoint
 
-- Sensitive configuration values remain outside source control.
-- Incoming requests are validated.
-- Business operations enforce appropriate authentication and authorization before public deployment.
-- Workflow approvals and rejections are protected against unauthorized access.
-- Database schema changes are managed through migrations.
-- Automated tests cover key business operations and error cases.
+Send the token in the HTTP request header:
 
-These are security and reliability requirements; they should be considered complete only after they have been implemented and verified.
+```http
+Authorization: Bearer <access-token>
+```
+
+The token must be valid, unexpired, and signed with the configured secret.
+
+## Workflow Approval
+
+The intended approval flow separates AI investigation from business execution:
+
+1. The Python service retrieves the relevant order information.
+2. AI agents produce an investigation, policy findings, and triage proposal.
+3. A workflow is created in the Java backend.
+4. An authorized user reviews the workflow.
+5. The user approves or rejects it.
+6. If approval succeeds, the backend performs the configured business action, such as creating a support ticket.
+
+The AI proposal itself should not bypass the approval process. Authorization, workflow-state checks, and ticket creation must be enforced by the backend.
+
+## Integration with Python AI
+
+The Python FastAPI service is responsible for AI orchestration and RAG. EnterpriseOps Business is responsible for business data and business operations.
+
+This separation helps prevent the AI orchestration service from directly modifying the business database and provides a central place for request validation and authorization.
+
+For deployment beyond local development, service-to-service authentication should also be configured where required.
+
+## Testing and Verification
+
+Before considering the application production-ready, verify:
+
+- Application startup and database connectivity.
+- Flyway migration success on a clean and existing database.
+- User registration and duplicate-email handling.
+- Login using username and email.
+- BCrypt password verification.
+- JWT signature and expiry validation.
+- Rejection of unauthenticated requests to protected endpoints.
+- Rejection of unauthorized workflow approval and rejection attempts.
+- Successful approval by authorized users.
+- Ticket creation only through permitted business flows.
+- Automated tests for success and failure scenarios.
+
+A successful Git commit or application compilation alone does not establish that all security controls work correctly.
 
 ## Planned Improvements
 
-The following areas are candidates for future development, depending on the current implementation:
+Potential improvements include:
 
-- Strengthen authentication and authorization.
-- Add or expand automated unit and integration tests.
-- Prevent duplicate workflow actions through appropriate idempotency controls.
-- Add audit logging for approvals, rejections, and important business changes.
-- Improve API documentation and standardized error responses.
-- Containerize the service for repeatable development and deployment.
-- Strengthen integration testing between Python orchestration and Java business APIs.
+- Comprehensive automated integration tests.
+- Email verification and password reset.
+- Refresh-token support and token revocation strategy.
+- Audit logging for approvals and rejections.
+- Stronger service-to-service authentication.
+- Idempotency for workflow actions.
+- Standardized API error responses.
+- Docker-based local development and deployment.
+- Monitoring, structured logs, and health checks.
 
 ## Project Goals
 
-EnterpriseOps Business aims to provide a reliable business backend for an AI-assisted customer-support and workflow-automation platform.
+EnterpriseOps Business aims to provide a reliable Java backend for an AI-assisted customer-support and workflow-automation platform.
 
-The project emphasizes a clear separation between AI orchestration and business operations, structured persistence, controlled workflow execution, and a backend architecture that can evolve as new business capabilities are introduced.
+The project emphasizes separation of AI orchestration from business execution, secure authentication, controlled workflow operations, structured persistence, and maintainable backend architecture.
 
 ## Project Status
 
 **Status: Active development**
 
-This repository contains the Java Spring Boot business service for the EnterpriseOps AI platform. The implemented features, API contracts, and operational behavior should be verified against the current source code before being considered production-ready.
+Features and security controls should be considered complete only after their behavior has been tested against the current codebase and configuration.
