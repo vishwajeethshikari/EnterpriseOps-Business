@@ -1,11 +1,8 @@
 
 package com.driveease.gateway.controller;
 
-import com.driveease.gateway.dto.CreateTicketRequest;
 import com.driveease.gateway.entity.SupportTicket;
 import com.driveease.gateway.service.SupportTicketService;
-
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,13 +14,6 @@ public class SupportTicketController {
     public SupportTicketController(
             SupportTicketService ticketService) {
         this.ticketService = ticketService;
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public SupportTicket createTicket(
-            @RequestBody CreateTicketRequest request) {
-        return ticketService.createTicket(request);
     }
 
     @GetMapping("/{ticketNumber}")
